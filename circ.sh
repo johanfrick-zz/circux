@@ -17,6 +17,7 @@ then
 	echo
 else
 	OP=$1
+# TODO: Check params like in the following example: https://github.com/andreafabrizi/Dropbox-Uploader/blob/master/dropbox_uploader.sh
 	OPTIONS="$2 $3 $4 $5 $6 $7" #Allow for more options in the future
 	LS=`echo $OP| grep "\--ls"`
 	SEND=`echo $OP| grep "\--send"`
