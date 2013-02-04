@@ -5,10 +5,10 @@ import sys, getopt
 def usage():
 	print
 	print "Usage:"
-	print "   circ <operation> [<files>] [<dest>]"
+	print "   circ.py <operation> [<files>] [<dest>]"
 	print
 	print "Example: "
-	print "   circ --ls photos/christmas2012 # list all files under photos/christmas2012 on Circ server"
+	print "   circ.py --ls photos/christmas2012 # list all files under photos/christmas2012 on Circ server"
 	print
 	print "Options:"
 	print "   --ls List files of chosen remote directory"
