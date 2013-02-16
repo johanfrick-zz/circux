@@ -4,12 +4,15 @@
 from __future__ import division
 
 import getopt
+import hashlib
+import requests
 import urllib
 import json
 import sys
 import signal
 import os
 import datetime
+import credentials
 
 def signal_handler(signal, frame):
 	print '\n Aborting...'
@@ -17,9 +20,9 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 try:
-	token = 'access_token=' + os.environ['CIRC_ACCESS_TOKEN']
+	token = 'access_token=' + credentials.ACCESS_TOKEN
 except:
-	print 'Missing environment variable CIRC_ACCESS_TOKEN'
+	print 'Missing ACCESS_TOKEN in credentials.py'
 	sys.exit(2)
 
 BASE_URL = 'https://api.circ.io/2/'
@@ -43,18 +46,51 @@ def get(method,param=''):
 	if param != '':
 		url = url + '&' + param
 	result = json.load(urllib.urlopen(url))
-	return result['response']
+	try:
+		return result['response']
+	except KeyError:
+		print result
 
-def processFiles(fileOperation):
-	sets = get('sets')
-	for set in sets:
-		files = get('sets/files','set_id=' + str(set['id']))
+def ignoreTrash(set):
+	return set['type'] != 6
+
+def getSets():
+	return filter(ignoreTrash, get('sets'))
+
+
+def processSets(setOperation, fileOperation):
+	for set in getSets():
+		setOperation(set, fileOperation)
+
+def processFiles(set, fileOperation):
+	files = get('sets/files', 'set_id=' + str(set['id']))
+	for file in files:
+		fileOperation(file)
+
+def deleteSets():
+	for set in getSets():
+		get('sets/delete', 'set_id=' + str(set['id']) + "&" + 'generation_id=' + str(set['generation_id']))
+
+def deleteFiles():
+	fileIds = ''
+	print 'Getting file ids...'
+	for set in getSets():
+		files = get('sets/files', 'set_id=' + str(set['id']))
+		print 'Found ' + str(len(files)) + ' files in set: ' + str(set['id'])
 		for file in files:
-			fileOperation(file)
+			fileIds += str(file['id'])   + ','
+	if fileIds != '':
+		print 'Starting delete...'
+		get('files/delete', 'file_id=' + fileIds)
+		print 'All deleted.'
+	else:
+		print 'Nothing to delete.'
+
 
 def listFile(file):
 	date = datetime.datetime.fromtimestamp(file['date_time_taken']).strftime('%Y-%m-%d %H:%M:%S')
 	print file['name'] + ' (' + picSize(file['size']) + ', ' + date + ')'
+	print file
 
 def downloadFile(file):
 	url = file['media_url'] + '&size=0'
@@ -69,8 +105,28 @@ def picSize(size):
 	res = size['width']*size['height']/1000000
 	return '%.2f%s' % (res, 'MP')
 
+def upload(file):
+	open(file, "r").read()
+	md5Hash = hashlib.md5(open(file, "r").read()).hexdigest()
+	print md5Hash
+	result = get('upload/query', 'file_name=' + file + '&file_size=' + str(os.path.getsize(file)) + '&upload_signature=' +
+	                             str(md5Hash))
+	print result
+	url = BASE_URL + 'upload/chunk' + '?' + token
+	url = url + '&file_id=' + str(result['file_id']) + '&offset=0'
+	requests.post(url, files={file: open(file, 'rb')})
+	print 'Uploaded chunk'
+	result = get('upload/finish', 'file_id=' + str(result['file_id']) + '&integrity_digest=' + str(md5Hash))
+	print result
+
+
+def uploadDir(dir):
+	for currentDir, subDirs, files in os.walk(dir):
+		for file in files:
+			upload(os.path.join(currentDir, file))
+
 try:
-	opts, args = getopt.getopt(sys.argv[1:], '', ['ls=', 'send=', 'get='])
+	opts, args = getopt.getopt(sys.argv[1:], '', ['ls=', 'send=', 'get=', 'delete-all='])
 except getopt.GetoptError, err:
 	print str(err)
 	usage()
@@ -83,12 +139,14 @@ if not opts:
 for option, argument in opts:
 	if option == '--ls':
 		print 'Listing ' + argument + '...'
-		processFiles(listFile)
+		processSets(processFiles, listFile)
 	if option == '--send':
 		print 'Sending ' + argument + '...'
+		uploadDir(argument)
 	if option == '--get':
 		print 'Downloading ' + argument + '...'
-		processFiles(downloadFile)
-
-
-
+		processSets(processFiles, downloadFile)
+	if option == '--delete-all':
+		print 'Deleting all ...'
+#		deleteSets()
+		deleteFiles()
