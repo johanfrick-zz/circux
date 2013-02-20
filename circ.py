@@ -13,7 +13,6 @@ import os
 import datetime
 import common
 
-BASE_URL = 'https://api.circ.io/2/'
 credentials = common.loadCredentials()
 
 def main():
@@ -62,7 +61,7 @@ def usage():
 	print '   --get Download remote files/folders to a local folder'
 	print
 
-def requestWithToken(method, baseUrl=BASE_URL, **param):
+def requestWithToken(method, baseUrl='https://api.circ.io/2/', **param):
 	try:
 		param['access_token'] = credentials['ACCESS_TOKEN']
 	except:
@@ -128,25 +127,23 @@ def picSize(size):
 	res = size['width']*size['height']/1000000
 	return '%.2f%s' % (res, 'MP')
 
-#http://bulk-api.circ.io/2/
-def upload(file):
-	open(file, "r").read()
-	md5Hash = hashlib.md5(open(file, "r").read()).hexdigest()
-	print md5Hash
-	result = requestWithToken('upload/query', file_name=file,file_size=os.path.getsize(file), upload_signature=md5Hash)
+def upload(filePath, fileName):
+	uploadUrl = 'http://bulk-api.circ.io/2/upload/'
+	md5Hash = hashlib.md5(open(filePath, "r").read()).hexdigest()
+	result = requestWithToken('query', baseUrl=uploadUrl, file_name=fileName, file_size=os.path.getsize(filePath), upload_signature=md5Hash, client_sig=credentials['CLIENT_SIG'])
 	print result
-	url = BASE_URL + 'upload/chunk' + '?access_token=' + credentials['ACCESS_TOKEN']
+	url = uploadUrl + 'chunk' + '?access_token=' + credentials['ACCESS_TOKEN']
 	url = url + '&file_id=' + str(result['file_id']) + '&offset=0'
-	requests.post(url, files={file: open(file, 'rb')})
+	requests.post(url, files={fileName: open(filePath, 'rb')})
 	print 'Uploaded chunk'
-	result = requestWithToken('upload/finish', file_id=result['file_id'], integrity_digest=md5Hash)
+	result = requestWithToken('finish', baseUrl=uploadUrl, file_id=result['file_id'], integrity_digest=md5Hash)
 	print result
 
 
 def uploadDir(dir):
 	for currentDir, subDirs, files in os.walk(dir):
-		for file in files:
-			upload(os.path.join(currentDir, file))
+		for fileName in files:
+			upload(os.path.join(currentDir, fileName), fileName)
 
 if __name__ == '__main__':
 	main()

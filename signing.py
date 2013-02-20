@@ -45,6 +45,7 @@ def menu():
 			client_sig=clientSig)
 		credentials['ACCESS_TOKEN'] = response['access_token']
 		credentials['REFRESH_TOKEN'] = response['refresh_token']
+		credentials['CLIENT_SIG'] = clientSig
 		common.saveCredentials(credentials)
 	elif selected == '2':
 		grantType = 'refresh_token'
@@ -56,6 +57,7 @@ def menu():
 			redirect_uri=REDIRECT_URI,
 			client_sig=clientSig)
 		credentials['ACCESS_TOKEN'] = response['access_token']
+		credentials['CLIENT_SIG'] = clientSig
 		common.saveCredentials(credentials)
 	else:
 		menu()
