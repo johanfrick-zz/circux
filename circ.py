@@ -12,6 +12,7 @@ import signal
 import os
 import datetime
 import common
+import base64
 
 credentials = common.loadCredentials()
 
@@ -60,6 +61,19 @@ def usage():
 	print '   --send Send local files to Circ'
 	print '   --get Download remote files/folders to a local folder'
 	print
+
+def uploadRequestWithToken(method, baseUrl='http://bulk-api.circ.io/2/', **param):
+	try:
+		param['access_token'] = credentials['HTTP_ACCESS_TOKEN']
+	except:
+		print 'Missing HTTP_ACCESS_TOKEN in ' + common.CREDENTIALS_FILE
+		sys.exit(2)
+	result = common.request(method, baseUrl, **param)
+	try:
+		return result['response']
+	except KeyError:
+		print result
+		sys.exit(2)
 
 def requestWithToken(method, baseUrl='https://api.circ.io/2/', **param):
 	try:
@@ -131,18 +145,21 @@ def upload(filePath, fileName):
 	uploadUrl = 'http://bulk-api.circ.io/2/upload/'
 	md5Hash = hashlib.md5(open(filePath, "r").read()).hexdigest()
 	fileSize = str(os.path.getsize(filePath))
-	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['ACCESS_TOKEN'] + 'file_name' + fileName + 'file_size' + fileSize + 'upload_signature' + md5Hash).hexdigest()
+	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['HTTP_ACCESS_TOKEN'] + 'file_name' + fileName + 'file_size' + fileSize + 'upload_signature' + md5Hash).hexdigest()
 
-	result = requestWithToken('query', baseUrl=uploadUrl, file_name=fileName, file_size=fileSize, upload_signature=md5Hash, client_sig=clientSig)
+	result = uploadRequestWithToken('query', baseUrl=uploadUrl, file_name=fileName, file_size=fileSize, upload_signature=md5Hash, client_sig=clientSig)
 	print result
 	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['HTTP_ACCESS_TOKEN'] + 'file_id' + str(result['file_id']) + 'offset' + str(result['offset'])).hexdigest()
+	file = open(filePath, 'rb');
+	base64img = base64.b64encode(file.read())
+	files = {fileName: base64img}
 	url = uploadUrl + 'chunk' + '?access_token=' + credentials['HTTP_ACCESS_TOKEN']
 	url = url + '&file_id=' + str(result['file_id']) + '&offset=' + str(result['offset']) + '&client_sig=' + clientSig
-	response = requests.post(url, files={fileName: open(filePath, 'rb')})
+	response = requests.post(url, data=files)
 	print 'Uploaded chunk'
 	print response.content
-	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['ACCESS_TOKEN'] + 'file_id' + str(result['file_id']) + 'integrity_digest' + md5Hash).hexdigest()
-	result = requestWithToken('finish', baseUrl=uploadUrl, file_id=result['file_id'], integrity_digest=md5Hash, client_sig=clientSig)
+	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['HTTP_ACCESS_TOKEN'] + 'file_id' + str(result['file_id']) + 'integrity_digest' + md5Hash).hexdigest()
+	result = uploadRequestWithToken('finish', baseUrl=uploadUrl, file_id=result['file_id'], integrity_digest=md5Hash, client_sig=clientSig)
 	print result
 
 
