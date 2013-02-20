@@ -130,13 +130,19 @@ def picSize(size):
 def upload(filePath, fileName):
 	uploadUrl = 'http://bulk-api.circ.io/2/upload/'
 	md5Hash = hashlib.md5(open(filePath, "r").read()).hexdigest()
-	result = requestWithToken('query', baseUrl=uploadUrl, file_name=fileName, file_size=os.path.getsize(filePath), upload_signature=md5Hash, client_sig=credentials['CLIENT_SIG'])
+	fileSize = str(os.path.getsize(filePath))
+	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['ACCESS_TOKEN'] + 'file_name' + fileName + 'file_size' + fileSize + 'upload_signature' + md5Hash).hexdigest()
+
+	result = requestWithToken('query', baseUrl=uploadUrl, file_name=fileName, file_size=fileSize, upload_signature=md5Hash, client_sig=clientSig)
 	print result
-	url = uploadUrl + 'chunk' + '?access_token=' + credentials['ACCESS_TOKEN']
-	url = url + '&file_id=' + str(result['file_id']) + '&offset=0'
-	requests.post(url, files={fileName: open(filePath, 'rb')})
+	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['HTTP_ACCESS_TOKEN'] + 'file_id' + str(result['file_id']) + 'offset' + str(result['offset'])).hexdigest()
+	url = uploadUrl + 'chunk' + '?access_token=' + credentials['HTTP_ACCESS_TOKEN']
+	url = url + '&file_id=' + str(result['file_id']) + '&offset=' + str(result['offset']) + '&client_sig=' + clientSig
+	response = requests.post(url, files={fileName: open(filePath, 'rb')})
 	print 'Uploaded chunk'
-	result = requestWithToken('finish', baseUrl=uploadUrl, file_id=result['file_id'], integrity_digest=md5Hash)
+	print response.content
+	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['ACCESS_TOKEN'] + 'file_id' + str(result['file_id']) + 'integrity_digest' + md5Hash).hexdigest()
+	result = requestWithToken('finish', baseUrl=uploadUrl, file_id=result['file_id'], integrity_digest=md5Hash, client_sig=clientSig)
 	print result
 
 

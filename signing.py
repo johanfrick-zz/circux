@@ -24,6 +24,7 @@ def menu():
 	print 'Do you want to:'
 	print '1. Generate an access token for the first time'
 	print '2. Refresh your access token?'
+	print '3. Generate an access token for uploads'
 	selected = raw_input('Select one:')
 	if selected == '1':
 		print 'Open the following URL in your browser and login with your Circ credentials:'
@@ -43,9 +44,9 @@ def menu():
 			redirect_uri=REDIRECT_URI,
 			state=STATE,
 			client_sig=clientSig)
+		print response
 		credentials['ACCESS_TOKEN'] = response['access_token']
 		credentials['REFRESH_TOKEN'] = response['refresh_token']
-		credentials['CLIENT_SIG'] = clientSig
 		common.saveCredentials(credentials)
 	elif selected == '2':
 		grantType = 'refresh_token'
@@ -57,7 +58,19 @@ def menu():
 			redirect_uri=REDIRECT_URI,
 			client_sig=clientSig)
 		credentials['ACCESS_TOKEN'] = response['access_token']
-		credentials['CLIENT_SIG'] = clientSig
+		credentials['REFRESH_TOKEN'] = response['refresh_token']
+		common.saveCredentials(credentials)
+	elif selected == '3':
+		grantType = 'refresh_token'
+		clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'client_id' + credentials['CLIENT_ID'] + 'grant_type' + grantType + 'redirect_uri' + REDIRECT_URI + 'refresh_token' + credentials['REFRESH_TOKEN'] ).hexdigest()
+		response = common.request('access',baseUrl='https://api.circ.io/oauth/',
+			client_id=credentials['CLIENT_ID'] ,
+			refresh_token=credentials['REFRESH_TOKEN'] ,
+			grant_type=grantType,
+			redirect_uri=REDIRECT_URI,
+			client_sig=clientSig)
+		credentials['HTTP_ACCESS_TOKEN'] = response['access_token']
+		credentials['REFRESH_TOKEN'] = response['refresh_token']
 		common.saveCredentials(credentials)
 	else:
 		menu()
