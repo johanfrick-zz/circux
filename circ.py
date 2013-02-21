@@ -150,12 +150,10 @@ def upload(filePath, fileName):
 	result = uploadRequestWithToken('query', baseUrl=uploadUrl, file_name=fileName, file_size=fileSize, upload_signature=md5Hash, client_sig=clientSig)
 	print result
 	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['HTTP_ACCESS_TOKEN'] + 'file_id' + str(result['file_id']) + 'offset' + str(result['offset'])).hexdigest()
-	file = open(filePath, 'rb');
-	base64img = base64.b64encode(file.read())
-	files = {fileName: base64img}
+	files = {'FILE': (fileName, open(filePath, 'rb'))}
 	url = uploadUrl + 'chunk' + '?access_token=' + credentials['HTTP_ACCESS_TOKEN']
 	url = url + '&file_id=' + str(result['file_id']) + '&offset=' + str(result['offset']) + '&client_sig=' + clientSig
-	response = requests.post(url, data=files)
+	response = requests.post(url, files=files)
 	print 'Uploaded chunk'
 	print response.content
 	clientSig = hashlib.md5(credentials['CLIENT_SECRET'] + 'access_token' + credentials['HTTP_ACCESS_TOKEN'] + 'file_id' + str(result['file_id']) + 'integrity_digest' + md5Hash).hexdigest()
